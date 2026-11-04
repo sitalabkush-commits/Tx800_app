@@ -1,0 +1,22 @@
+name: tx800_mini
+description: Tx 800 Mini - voice based AI companion with sci-fi HUD interface.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  record: ^5.1.2
+  audioplayers: ^6.1.0
+  flutter_tts: ^4.2.0
+  http: ^1.2.2
+  permission_handler: ^11.3.1
+  path_provider: ^2.1.4
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/audio/

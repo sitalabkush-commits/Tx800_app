@@ -1,0 +1,64 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      # android/ ফোল্ডার না থাকলে নিজে তৈরি করবে (pubspec.yaml ও main.dart অক্ষত থাকবে)
+      - name: Create Android scaffold if missing
+        run: |
+          if [ ! -d android ]; then
+            cp pubspec.yaml /tmp/pubspec.yaml.bak
+            cp lib/main.dart /tmp/main.dart.bak
+            flutter create --platforms=android --org com.tx800 --project-name tx800_mini .
+            cp /tmp/pubspec.yaml.bak pubspec.yaml
+            cp /tmp/main.dart.bak lib/main.dart
+          fi
+
+      - name: Patch AndroidManifest (permissions, TTS query, label)
+        run: |
+          M=android/app/src/main/AndroidManifest.xml
+          if ! grep -q "RECORD_AUDIO" "$M"; then
+            sed -i '0,/<manifest[^>]*>/s//&\n    <uses-permission android:name="android.permission.RECORD_AUDIO"\/>\n    <uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"\/>\n    <uses-permission android:name="android.permission.WAKE_LOCK"\/>\n    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28"\/>\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"\/>\n    <queries><intent><action android:name="android.intent.action.TTS_SERVICE"\/><\/intent><\/queries>/' "$M"
+          fi
+          sed -i 's/android:label="[^"]*"/android:label="Tx 800 Mini"/' "$M"
+          cat "$M"
+
+      - name: Set minSdk 24
+        run: |
+          for f in android/app/build.gradle android/app/build.gradle.kts; do
+            if [ -f "$f" ]; then
+              sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 24/; s/minSdkVersion flutter.minSdkVersion/minSdkVersion 24/' "$f"
+            fi
+          done
+
+      - name: Ensure assets folder exists
+        run: |
+          mkdir -p assets/audio
+          touch assets/audio/.keep
+
+      - run: flutter pub get
+
+      - run: flutter build apk --release
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tx800-mini-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
